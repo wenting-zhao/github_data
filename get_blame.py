@@ -31,7 +31,7 @@ def get_git_blame(repo_url, file_path, branch):
         try:
             blame_dict = json.loads(block.string)['payload']['blame']
         except:
-            import pdb; pdb.set_trace()
+            # This happens when the file cant be found so it cant be blamed.
             continue
 
         commit_oid_to_info = {}
