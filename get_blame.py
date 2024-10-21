@@ -6,6 +6,7 @@ token = os.getenv('GITHUB_TOKEN')
 
 # Get the file's commit history to identify blame info
 def get_blame(repo_owner, repo_name, file_paths, branch='main'):
+    import pdb; pdb.set_trace()
     # Initialize the GhApi client
     api = GhApi(owner=repo_owner, repo=repo_name, token=token)
     # Get the latest commit sha for the given branch
