@@ -63,7 +63,7 @@ print(blame_info)
 
 
 from datasets import load_dataset
-
+import datetime
 import re
 import os
 import boto3
@@ -90,11 +90,9 @@ for sample in iter(ds):
         print("Found nothing for ", repo_url)
         continue
     sample["blame_info"] = blame_info
-    sample["visit_date"] = sample["visit_date"].strftime("%Y-%m-%d %H:%M:%S")
-    sample["revision_date"] = sample["revision_date"].strftime("%Y-%m-%d %H:%M:%S")
-    sample["committer_date"] = sample["committer_date"].strftime("%Y-%m-%d %H:%M:%S")
-    if sample["gha_event_created_at"]:
-        sample["gha_event_created_at"] = sample["gha_event_created_at"].strftime("%Y-%m-%d %H:%M:%S")
+    for key, value in sample.items():
+        if isinstance(value, datetime.datetime):
+            sample[key] = sample[key].strftime("%Y-%m-%d %H:%M:%S")
         
     blamed_data.append(sample)
 
