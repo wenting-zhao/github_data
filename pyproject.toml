@@ -6,6 +6,10 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "beautifulsoup4>=4.12.3",
+    "boto3>=1.35.44",
+    "datasets>=3.0.1",
     "ghapi>=1.0.6",
+    "hf-transfer>=0.1.8",
     "requests>=2.32.3",
+    "smart-open>=7.0.5",
 ]

@@ -20,7 +20,6 @@ def get_git_blame(repo_url, file_path, branch):
     
     # Parse the HTML content using BeautifulSoup
     soup = BeautifulSoup(response.content, "html.parser")
-    print(soup)
     
     # Find all the blame information blocks
     blame_blocks = soup.find_all("div", class_="blame-hunk")
