@@ -1,40 +1,45 @@
-from ghapi.all import GhApi
-import os
+import requests
+from bs4 import BeautifulSoup
 
-# Get environment variables
-token = os.getenv('GITHUB_TOKEN')
-
-# Get the file's commit history to identify blame info
-def get_blame(repo_owner, repo_name, file_paths, branch='main'):
-    import pdb; pdb.set_trace()
-    # Initialize the GhApi client
-    api = GhApi(owner=repo_owner, repo=repo_name, token=token)
-    # Get the latest commit sha for the given branch
-    ref_data = api.repos.get_branch(branch=branch)
-    latest_commit_sha = ref_data.commit.sha
+def get_git_blame(repo_url, file_path, branch):
+    """
+    Performs a Git blame for a file in a GitHub repository.
     
-    blame_data = {}
+    Args:
+        repo_url (str): The URL of the GitHub repository.
+        file_path (str): The path to the file within the repository.
+    
+    Returns:
+        dict: A dictionary containing the Git blame information for the file.
+    """
+    # Construct the GitHub blame URL
+    blame_url = f"{repo_url}/blame/{branch}/{file_path}"
+    
+    # Make a request to the GitHub blame page
+    response = requests.get(blame_url)
+    
+    # Parse the HTML content using BeautifulSoup
+    soup = BeautifulSoup(response.content, "html.parser")
+    print(soup)
+    
+    # Find all the blame information blocks
+    blame_blocks = soup.find_all("div", class_="blame-hunk")
+    
+    # Extract the blame information
+    blame_info = {}
+    for block in blame_blocks:
+        commit_hash = block.find("a", class_="js-navigation-open")["href"].split("/")[-1]
+        commit_author = block.find("span", class_="blame-commit-author").text.strip()
+        commit_timestamp = block.find("tag-timestamp")["datetime"]
+        blame_info[commit_hash] = {
+            "author": commit_author,
+            "timestamp": commit_timestamp
+        }
+    
+    return blame_info
 
-    for file_path in file_paths:
-        # Get blame information via the contents API
-        blame_info = api.repos.get_blame(
-            owner=repo_owner,
-            repo=repo_name,
-            ref=latest_commit_sha,
-            path=file_path
-        )
-        blame_data[file_path] = []
-
-        # Parsing and displaying blame information
-        for commit in blame_info.get('blame', []):
-            author = commit['author']['name']
-            commit_sha = commit['commit']['sha']
-            lines = commit['ranges'][0]['lines']
-
-            blame_data[file_path].append({
-                "commmit": commit_sha,
-                "author": author,
-                "lines": lines
-            })
-    return blame_data
-
+# Example usage
+repo_url = "https://github.com/wenting-zhao/github_data"
+file_path = "get_blame.py"
+branch = "main"
+blame_info = get_git_blame(repo_url, file_path, branch)
