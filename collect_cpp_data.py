@@ -10,3 +10,4 @@ from datasets import load_dataset
 ds = load_dataset("bigcode/the-stack-v2", "C++", split="train")
 ds = ds.filter(lambda example: example["revision_date"].year <= 2011)
 ds.push_to_hub("wentingzhao/stack-v2-cpp-2011")
+
