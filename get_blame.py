@@ -50,6 +50,7 @@ def get_git_blame(repo_url, file_path, branch):
                 blame_info[committer_email][-1][1] = blame_range['end']
             else:
                 blame_info[committer_email].append([blame_range['start'], blame_range['end']])
+            # blame_info[committer_email].extend(list(range(blame_range['start'], blame_range['end']+1))) #because list of lists is not liked
     
     return blame_info
 
@@ -61,9 +62,8 @@ blame_info = get_git_blame(repo_url, file_path, branch)
 
 print(blame_info)
 
-
-from datasets import load_dataset
-import datetime
+from datasets import load_dataset, Dataset
+from datetime import datetime
 import re
 import os
 import boto3
@@ -74,10 +74,12 @@ session = boto3.Session(
     aws_secret_access_key=os.environ["AWS_SECRET_ACCESS_KEY"])
 s3 = session.client("s3")
 
+# def gen():
+start_time = datetime.now()
 blamed_data = []
 # dataset streaming (will only download the data as needed)
-# ds = load_dataset("wentingzhao/stack-v2-cpp-2011", streaming=True, split="train")
-ds = load_dataset("bigcode/the-stack-v2", "C++", streaming=True, split="train")
+ds = load_dataset("wentingzhao/stack-v2-cpp-2011-windows", split="train")
+# ds = load_dataset("bigcode/the-stack-v2", "C++", streaming=True, split="train")
 for sample in iter(ds): 
     repo_url = f"https://github.com/{sample['repo_name']}"
     branch_name = sample['branch_name']
@@ -89,15 +91,32 @@ for sample in iter(ds):
     if len(blame_info) == 0: 
         print("Found nothing for ", repo_url)
         continue
-    sample["blame_info"] = blame_info
+
+    authors = []
+    author_lines = []
+    for author, written_lines in blame_info.items():
+        authors.append(author)
+        author_lines.append(written_lines)
+    sample["authors"] = authors  
+    sample["author_lines"] = author_lines  
+    # sample["blame_info"] = blame_info  
+    # sample["blame_info"] = {user: len(lines) for user, lines in blame_info.items()}
+
     for key, value in sample.items():
-        if isinstance(value, datetime.datetime):
+        if isinstance(value, datetime):
             sample[key] = sample[key].strftime("%Y-%m-%d %H:%M:%S")
         
     blamed_data.append(sample)
 
-    with open("blamed_data.json", 'w') as wf:
-        json.dump(blamed_data, wf, indent=4)
-    
-ds = Dataset.from_list(blamed_data)
-ds.push_to_hub("celinelee/stack-v2-cpp-2011-blamed")
+    time_diff = (datetime.now() - start_time).total_seconds() / 60.
+    total_est_time = time_diff * len(ds) / len(blamed_data)
+    print(f"est time (mins): {total_est_time:.2f}")
+
+    if len(blamed_data) % 50 == 0:
+        with open("blamed_data-2011-windows.json", 'w') as wf:
+            json.dump(blamed_data, wf, indent=4)
+        blamed_ds = Dataset.from_list(blamed_data)
+        blamed_ds.push_to_hub("celinelee/stack-v2-cpp-2011-windows-blamed")
+
+blamed_ds = Dataset.from_list(blamed_data)
+blamed_ds.push_to_hub("celinelee/stack-v2-cpp-2011-windows-blamed")
