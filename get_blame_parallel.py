@@ -7,7 +7,9 @@ import boto3
 from smart_open import open
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import threading
+import json
 from tqdm import tqdm
+from datetime import datetime
 
 
 def get_git_blame(repo_url, file_path, branch):
@@ -59,7 +61,6 @@ def get_git_blame(repo_url, file_path, branch):
             else:
                 blame_info[committer_email].append([blame_range['start'], blame_range['end']])
             # blame_info[committer_email].extend(list(range(blame_range['start'], blame_range['end']+1))) #because list of lists is not liked
-    
     return blame_info
 
 session = boto3.Session(
@@ -68,7 +69,9 @@ session = boto3.Session(
 s3 = session.client("s3")
 
 # def gen():
-blamed_data = []
+blamed_data_pretrain = []
+blamed_data_ft = []
+blamed_data_test = []
 blamed_data_lock = threading.Lock()
 
 # Define your processing function
@@ -97,34 +100,36 @@ def process_sample(sample):
         sample["authors"] = authors
         sample["author_lines"] = author_lines
 
-        # Convert datetime objects to strings
-        for key, value in sample.items():
-            if isinstance(value, datetime):
-                sample[key] = value.strftime("%Y-%m-%d %H:%M:%S")
-
         return sample
     except Exception as e:
         print(f"Error processing sample {sample['repo_name']}: {e}")
         return None
 
 # Load your dataset
-ds = load_dataset("wentingzhao/stack-v2-cpp-2011-windows", split="train").select(range(100))
+ds = load_dataset("celinelee/stack-v2-cpp-2019", split="train")
+maybe_satoshi_authors = []
 
 with tqdm(total=len(ds), desc="Processing samples") as pbar:
-    with ThreadPoolExecutor(max_workers=10) as executor:
+    with ThreadPoolExecutor(max_workers=500) as executor:
         futures = {executor.submit(process_sample, sample): sample for sample in ds}
     
         for idx, future in enumerate(as_completed(futures)):
             result = future.result()
             if result is not None:
                 with blamed_data_lock:
-                    blamed_data.append(result)
+                    if len(set(result['authors']) & set(maybe_satoshi_authors)):
+                        blamed_data_test.append(result)
+                    elif result['revision_date'].year < 2011: 
+                        blamed_data_ft.append(result)
+                    else:
+                        blamed_data_pretrain.append(result)
             pbar.update(1)  # Update progress bar
-            
-            if (idx + 1) % 50 == 0:
-                blamed_ds = Dataset.from_list(blamed_data)
-                blamed_ds.push_to_hub("wentingzhao/stack-v2-cpp-2011-windows-blamed")
+        if len(blamed_data_pretrain) % 50 < 2:
+            blamed_ds_pretrain = Dataset.from_list(blamed_data_pretrain)
+            blamed_ds_pretrain.push_to_hub("celinelee/thestack-v2-cpp-2019-blamed")
 
 # Final save after all samples are processed
-blamed_ds = Dataset.from_list(blamed_data)
-blamed_ds.push_to_hub("wentingzhao/stack-v2-cpp-2011-windows-blamed")
+blamed_ds_pretrain = Dataset.from_list(blamed_data_pretrain)
+blamed_ds_pretrain.push_to_hub("celinelee/thestack-v2-cpp-2019-blamed")
+
+
